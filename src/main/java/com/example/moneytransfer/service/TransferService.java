@@ -62,6 +62,9 @@ public class TransferService {
     }
 
     private void validate(TransferRequest request) {
+        if (request == null) {
+            throw new InvalidTransferException("Transfer request is required");
+        }
         if (request.getFromAccountId() == null || request.getToAccountId() == null) {
             throw new InvalidTransferException("fromAccountId and toAccountId are required");
         }
