@@ -14,9 +14,11 @@ import java.math.BigDecimal;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TransferServiceTest {
 
@@ -121,5 +123,32 @@ class TransferServiceTest {
 
         assertEquals(new BigDecimal("950.00"), repository.findById("acc-1").get().getBalance());
         assertEquals(new BigDecimal("550.00"), repository.findById("acc-2").get().getBalance());
+    }
+
+    @Test
+    void oppositeDirectionTransfersShouldNotDeadlock() throws InterruptedException {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch latch = new CountDownLatch(2);
+
+        pool.submit(() -> {
+            try {
+                service.transfer(request("acc-1", "acc-2", "100.00"));
+            } finally {
+                latch.countDown();
+            }
+        });
+
+        pool.submit(() -> {
+            try {
+                service.transfer(request("acc-2", "acc-1", "50.00"));
+            } finally {
+                latch.countDown();
+            }
+        });
+
+        boolean completed = latch.await(5, TimeUnit.SECONDS);
+        
+        assertTrue(completed, "Transfers should complete without deadlock");
+        pool.shutdown();
     }
 }
